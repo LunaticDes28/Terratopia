@@ -1,11 +1,12 @@
 {
 	"grassland__": {
-		"pixelsPerUnit": 2250
+		"pixelsPerUnit": 2112,
+		"pivot": [0.5, 0.4] 
 	},
 	"stagestation__": {
 		"pixelsPerUnit": 1800
 	},
 	"ranch__": {
-		"pixelsPerUnit": 1000
+		"pixelsPerUnit": 625
 	}
 }

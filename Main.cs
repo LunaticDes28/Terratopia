@@ -142,11 +142,11 @@ public static class Main
             WorldCoordinates pathCord = __instance.Path[j];
             TileData tile = gameState.Map.GetTile(pathCord);
             
-            // Heal 6 for units with at least 15 health cap, otherwise 4
+            // Heal 6 for units with at least 15 max health, otherwise 4
             gameState.GameLogicData.TryGetData(unitState.type, out unitData);
-	        var healAmount = unitData.health >= 15 ? 6 : 4;
+	        var healAmount = unitData.health >= 15 ? 60 : 40;
             // Heal the unit if it passes through a Stage Station owned by the player
-            if (tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("stagestation")) && tile.owner == __instance.PlayerId)
+            if (tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("stagestation")) && tile.owner == __instance.PlayerId && unitState.health < unitData.health)
             {
                 gameState.ActionStack.Add(new HealAction(__instance.PlayerId, targetCord, (ushort)healAmount));
             }
@@ -274,17 +274,19 @@ public static class Main
             }
 
             // Upgrade ranch if patch is larger than 1 tile / 3 tiles / 5 tiles
-            modLogger.LogInfo("Grassland patch size: " + grasslandCount)
-            if (grasslandCount >= 5)
-                tile.improvement.level = 3;
-                modLogger.LogInfo("Level 3 Ranch")
-            else if (grasslandCount >= 3)
+            modLogger.LogInfo("Grassland patch size: " + grasslandCount);
+            tile.improvement.level = 1;
+            modLogger.LogInfo("Level 1 Ranch");
+            if (grasslandCount >= 3)
+            {
                 tile.improvement.level = 2;
-                modLogger.LogInfo("Level 2 Ranch")
-            else
-                tile.improvement.level = 1;
-                modLogger.LogInfo("Level 1 Ranch")
-            
+                modLogger.LogInfo("Level 2 Ranch");
+            }
+            if (grasslandCount >= 5)
+            {
+                tile.improvement.level = 3;
+                modLogger.LogInfo("Level 1 Ranch");
+            }
             }
     }
 
@@ -299,25 +301,25 @@ public static class Main
 
         if (improvementData.maxLevel > 0 && level > 0)
         {
-            modLogger.LogInfo("LevelRewardCalculation running!")
-            foreach (GrowthRewards growthRewards in improvementData.growthRewards)
-            {
+            modLogger.LogInfo("LevelRewardCalculation running!");
                 if (Parse.customPopulation.TryGetValue(improvementData.type, out var value))
-                    modLogger.LogInfo("customPopulation found!")
                 {
+                    modLogger.LogInfo("customPopulation is located!");
                     int arrayIndex = level - 1;
                     if (arrayIndex >= 0 && arrayIndex < value.Length)
                     {
-                    modLogger.LogInfo(value[arrayIndex])
+                    modLogger.LogInfo(value[arrayIndex]);
                         num += value[arrayIndex];
                     }
                 }
                 else
                 {
-                    modLogger.LogInfo("Population used!")
-                    num += growthRewards.population * level;
+                    modLogger.LogInfo("Population is located!");
+                    foreach (GrowthRewards growthRewards in improvementData.growthRewards)
+                    {
+                        num += growthRewards.population * level;
+                    }
                 }
-            }
         }
 
         __result = num;        // This replaces the original return value
