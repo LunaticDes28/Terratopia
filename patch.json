@@ -1,0 +1,145 @@
+{
+	"tribeData": {},
+	"unitAbility": {},
+	"unitData": {},
+	"resourceData": {},
+	"techData": {
+		"riding": {
+			"techUnlocks": [
+				"roads",
+				"pastoralism"
+			],
+			"unitUnlocks": [
+				"rider"
+			],
+			"movementUnlocks": {
+				"grassland": 1
+			},
+			"cost": 1,
+			"idx": 1
+		},
+		"pastoralism": {
+			"techUnlocks": [
+				"chivalry"
+			],
+			"improvementUnlocks": [
+				"ranch"
+			],
+			"cost": 2,
+			"idx": -1
+		},
+		"roads": {
+			"techUnlocks": [
+				"trade"
+			],
+			"improvementUnlocks": [
+				"road",
+				"bridge",
+				"stagestation"
+			],
+			"cost": 2,
+			"idx": 4
+		},
+		"trade": {
+			"improvementUnlocks": [
+				"market",
+				"temple"
+			],
+			"cost": 3,
+			"taskUnlocks": [
+				"wealth"
+			],
+			"idx": 5
+		},
+		"meditation": {
+			"techUnlocks": [
+				"philosophy"
+			],
+			"improvementUnlocks": [
+				"mountaintemple"
+			],
+			"abilityUnlocks": [
+				"disband"
+			],
+			"cost": 2,
+			"taskUnlocks": [
+				"pacifist"
+			],
+			"idx": 21
+		}
+	},
+	"improvementData": {
+		"road": {
+			"cost": 3,
+			"terrainRequirements": [
+				{
+					"terrain": "field"
+				},
+				{
+					"terrain": "forest"
+				},
+				{
+					"terrain": "grassland"
+				}
+			],
+			"improvementAbilities": [
+				"freelance"
+			],
+			"maxLevel": 0,
+			"idx": 3
+		},
+		"stagestation": {
+			"cost": 5,
+			"terrainRequirements": [
+				{
+					"terrain": "grassland"
+				}
+			],
+			"improvementAbilities": [
+				"stage"
+			],
+			"maxLevel": 0,
+			"idx": -1
+		},
+		"ranch": {
+			"cost": 10,
+			"terrainRequirements": [
+				{
+					"terrain": "grassland"
+				}
+			],
+			"improvementAbilities": [
+				"limited",
+				"frontier"
+			],
+			"maxLevel": 3,
+			"rewards": [
+				{
+					"population": 0
+				}
+			],
+			"idx": -1,
+			"growthRewards": [
+				{
+					"score": 0,
+					"population": 0,
+					"customPopulation": [3,5,6]
+				}
+			]
+		}
+	},
+	"terrainData": {
+		"grassland": {
+			"idx": -1
+		}
+	},
+	"skinData": {},
+	"improvementAbility": {
+		"stage": {
+			"idx": -1
+		},
+		"frontier": {
+			"idx": -1
+		}
+	}
+}

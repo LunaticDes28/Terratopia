@@ -1,0 +1,14 @@
+{
+	"terrain_grassland": {
+		"English": "Grassland"
+	},
+	"improvement_stagestation": {
+		"English": "Stage Station"
+	},
+	"improvement_ranch": {
+		"English": "Ranch"
+	},
+	"technology_pastoralism": {
+		"English": "Pastoralism"
+	}
+}

@@ -1,0 +1,36 @@
+    public static void ParseWithHandlerIntoArray<PDataType, targetType, listType>(JObject token, string fieldName, List<PDataType> list, Func<PDataType> factory) where targetType : struct, System.IConvertible where listType : struct, System.IConvertible
+    {
+        if (token != null)
+        {
+            if (EnumCache<targetType>.TryGetType(token.Path.Split('.').Last(), out var type))
+            {
+                int idx = ModData.FindData(list, type);
+                if (idx == -1)
+                {
+                    PDataType newone = factory();
+                    list.Add(newone);
+                    ModData.OverrideField(list, "type", list.Count - 1, type);
+                    idx = list.Count - 1;
+                }
+                if (token[fieldName] != null)
+                {
+                    ModData.OverrideField(list, fieldName, idx, ParseEnumsToSysList<listType>(token[fieldName]));
+                }
+            }
+        }
+
+    }
+    public static List<T> ParseEnumsToSysList<T>(JToken token)
+    where T : struct, System.IConvertible
+    {
+        List<T> types = new List<T>();
+
+        if(token.HasValues)
+        foreach (string s in token.Values<string>().ToList())
+        {
+            EnumCache<T>.TryGetType(s, out var type);
+            types.Add(type);
+        }
+
+        return types;
+    }

@@ -1,0 +1,45 @@
+    public static class ModTileData
+    {
+        // Using ConditionalWeakTable to associate custom data (HasTree) with TileData class
+        // Without modifying the original TileData class directly
+        private static readonly ConditionalWeakTable<TileData, TreeState> TreeRegistry = 
+            new ConditionalWeakTable<TileData, TreeState>();
+
+        // ConditionalWeakTable requires a class input
+        // Define custom class (TreeState) to hold HasTree value
+        private class TreeState
+        {
+            public bool HasTree = false;
+        }
+
+        // Provide a "getter" method for external calls to check if a tile has a tree
+        public static bool get_HasTree(TileData tile)
+        {
+            if (tile == null) return false;
+            return TreeRegistry.GetOrCreateValue(tile).HasTree;
+        }
+
+        // Provide a "setter" method for external calls to set the HasTree value for a tile
+        public static void set_HasTree(TileData tile, bool value)
+        {
+            if (tile == null) return;
+            TreeRegistry.GetOrCreateValue(tile).HasTree = value;
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(ActionUtils), nameof(ActionUtils.KillUnit))]
+    private static void ActionUtils_KillUnit(GameState gameState, TileData tile)
+    {
+        // UnitState unitState;
+	    // PlayerState playerState;
+        UnitData unitData;
+	    
+        if (gameState.GameLogicData.TryGetData(tile.unit.type, out unitData))
+        {
+            if (unitData.HasAbility(EnumCache<UnitAbility.Type>.GetType("leaf")))
+            {
+                ModTileData.set_HasTree(tile, true);
+            }
+        }
+    }
