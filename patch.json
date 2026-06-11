@@ -213,9 +213,6 @@
 	},
 	"resourceData": {
 		"livestock": {
-			"resourceTerrainRequirements": [
-				"grassland"
-			],
 			"idx": -1
 		}
 	},
