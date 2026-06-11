@@ -274,7 +274,7 @@ public static class Main
         }
 
         // Allow herd only when there is grassland within city area
-        if (improvement.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("herd")))
+        if (improvement.type == EnumCache<ImprovementData.Type>.GetType("herding"))
         {
             __result = false;
             // Check if same city area has grassland tile
@@ -317,7 +317,7 @@ public static class Main
             }
 
             // Herd ability relocates game to nearest grassland within city and turns it into a livestock resource
-            if (improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("herd")))
+            if (improvementData.type == EnumCache<ImprovementData.Type>.GetType("herding"))
             {
                 // Check if same city area has grassland tile
                 if (gameState.GameLogicData.TryGetData(playerState.tribe, out TribeData tribeData))
