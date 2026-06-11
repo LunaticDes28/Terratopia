@@ -504,10 +504,10 @@ public static class Main
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(CommandUtils), nameof(CommandUtils.GetTrainableUnits))]
-    private static void CommandUtils_GetTrainableUnits(GameState gameState, PlayerState player, TileData tile, ref List<TrainCommand> __result, bool includeUnavailable = false)
+    private static void CommandUtils_GetTrainableUnits(GameState gameState, PlayerState player, TileData tile, ref Il2CppSystem.Collections.Generic.List<TrainCommand> __result, bool includeUnavailable = false)
     {
         ImprovementData improvementData;
-		List<TrainCommand> list = new List<TrainCommand>();
+		Il2CppSystem.Collections.Generic.List<TrainCommand> list = new Il2CppSystem.Collections.Generic.List<TrainCommand>();
         if (tile.improvement != null
             && gameState.GameLogicData.TryGetData(tile.improvement.type, out improvementData)
             && improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("ranch")))

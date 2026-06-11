@@ -87,6 +87,24 @@
 			"weapon": 1,
 			"promotionLimit": 3,
 			"idx": 3
+		},
+		"sentinel": {
+			"health": 100,
+			"defence": 10,
+			"movement": 2,
+			"range": 1,
+			"attack": 20,
+			"cost": 3,
+			"unitAbilities": [
+				"dash",
+				"escape",
+				"fortify",
+				"mercenary",
+				"land"
+			],
+			"weapon": 1,
+			"promotionLimit": 3,
+			"idx": -1
 		}
 	},
 	"improvementData": {
