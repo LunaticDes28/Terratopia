@@ -21,7 +21,8 @@
 			],
 			"improvementUnlocks": [
 				"ranch",
-				"herding"
+				"herding",
+				"butching"
 			],
 			"abilityUnlocks": [
 			],
@@ -106,6 +107,24 @@
 				}
 			],
 			"shouldSuggestUnlock": true,
+			"idx": -1
+		},
+		"butching": {
+			"terrainRequirements": [
+				{
+					"resource": "livestock"
+				}
+			],
+			"improvementAbilities": [
+				"consumed",
+				"manual"
+			],
+			"maxLevel": 0,
+			"rewards": [
+				{
+					"population": 2
+				}
+			],
 			"idx": -1
 		},
 		"stagestation": {

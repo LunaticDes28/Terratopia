@@ -30,7 +30,6 @@ public static class Main
 		gameState.ActionStack.Add(new IncreaseCurrencyAction(player.Id, tile.coordinates, 1000, 10));
     }
 
-
     [HarmonyPostfix]
     [HarmonyPatch(typeof(MapGenerator), nameof(MapGenerator.AddTerrain))]
     private static void MapGenerator_AddTerrain(MapData map, List<PlayerState> playerStates, int version, MapGeneratorSettings settings, List<int> landTileIndices)
@@ -110,7 +109,7 @@ public static class Main
                 var dist = MapDataExtensions.ChebyshevDistance(tilePos, cityPos);
                 if (dist < 2) return;
         
-        // Skip tiles in capital
+        // Skip tiles in any empire
         if (tile.owner != 0) return;
 
         // Set terrain to grassland
@@ -160,6 +159,7 @@ public static class Main
         }
     }
 
+    // Thanks for klipi
     // A custom terrain that sits on field tile needs this to render the field sprite
     [HarmonyPostfix]
     [HarmonyPatch(typeof(TerrainRenderer), nameof(TerrainRenderer.UpdateGraphics))]
@@ -182,6 +182,7 @@ public static class Main
         }
     }
 
+    // Thanks for klipi
     // A convenient method to render the custom terrain sprite on the field tile
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Tile), nameof(Tile.RenderTerrain))]
@@ -243,6 +244,7 @@ public static class Main
         }
 
         // Allow only one Ranch built on a single connected grassland patch from ALL players
+        // "frontier" = allow only player to build this in a specific area
         if (improvement.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("frontier"))) {
             // Check connected grassland tiles for existing ranch
             Queue<TileData> toCheck = new Queue<TileData>();
@@ -270,23 +272,72 @@ public static class Main
                 }
             }
         }
-
+        
+        // Allow herd only when there is grassland within city area
+        if (improvement.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("herd")))
+        {
+            __result = false;
+            // Check if same city area has grassland tile
+            if (gameState.GameLogicData.TryGetData(playerState.tribe, out TribeData tribeData))
+            {
+                Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, tile);
+                for (int j = 0; j < cityAreaSorted.Count; j++)
+                {
+                    TileData tileData2 = cityAreaSorted[j];
+                    if (tileData2.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland")
+                        && tileData2.improvement == null && tileData2.resource == null)
+                    {
+                        tileData2.resource = new ResourceState
+                        {
+                            type = EnumCache<ResourceData.Type>.GetType("livestock")
+                        };
+                        __result = true;
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(BuildAction), nameof(BuildAction.ExecuteDefault))]
     private static void BuildAction_ExecuteDefault(BuildAction __instance, GameState gameState)
     {
-    TileData tile = gameState.Map.GetTile(__instance.Coordinates);
-	ImprovementData improvementData;
-	PlayerState playerState;
+        TileData tile = gameState.Map.GetTile(__instance.Coordinates);
+        ImprovementData improvementData;
+        PlayerState playerState;
 
-	// Call the level updating function to update population reward (up/down) for city
-    // For improvements that use custom population reward logics (etc.lord)
-	if (tile != null && gameState.GameLogicData.TryGetData(__instance.Type, out improvementData) && gameState.TryGetPlayer(__instance.PlayerId, out playerState))
-        if (improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
-        {
-            ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);
+	    if (tile != null && gameState.GameLogicData.TryGetData(__instance.Type, out improvementData) && gameState.TryGetPlayer(__instance.PlayerId, out playerState))
+        {   
+            // Call the level updating function to update population reward (up/down) for city
+            // For improvements that use custom population reward logics (etc.lord)
+            if (improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
+            {
+                ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);
+            }
+
+            // Herd ability relocates game to nearest grassland within city and turns it into a livestock resource
+            if (improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("herd")))
+            {
+                // Check if same city area has grassland tile
+                if (gameState.GameLogicData.TryGetData(playerState.tribe, out TribeData tribeData))
+                {
+                    Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, tile);
+                    for (int j = 0; j < cityAreaSorted.Count; j++)
+                    {
+                        TileData tileData2 = cityAreaSorted[j];
+                        if (tileData2.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland")
+                            && tileData2.improvement == null && tileData2.resource == null)
+                        {
+                            tileData2.resource = new ResourceState
+                            {
+                                type = EnumCache<ResourceData.Type>.GetType("livestock")
+                            };
+                            break; // only place livestock once for each game herded
+                        }
+                    }
+                }        
+            }
         }
     }
 
@@ -301,6 +352,7 @@ public static class Main
         int territoryCount = 0;
         
         // This is the custom level up/down logic of "lord" ability
+        // "territory" = required min connected tiles of the required terrain type
         if (Parse.territory.TryGetValue(tile.improvement.type, out var value))
         {
             // What is the terrain type requirement of this improvement?
