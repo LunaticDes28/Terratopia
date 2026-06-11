@@ -272,7 +272,7 @@ public static class Main
                 }
             }
         }
-        
+
         // Allow herd only when there is grassland within city area
         if (improvement.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("herd")))
         {
