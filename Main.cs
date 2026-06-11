@@ -19,6 +19,7 @@ public static class Main
 
     }
 
+    // For playtest
     [HarmonyPostfix]
     [HarmonyPatch(typeof(MapGenerator), nameof(MapGenerator.addStartingResourcesToCapital))]
     private static void MapGenerator_AddStartingResourcesToCapital(MapData map, GameState gameState, PlayerState player, Il2CppSystem.Collections.Generic.List<ResourceData> startingResources, int minResourcesCount)
