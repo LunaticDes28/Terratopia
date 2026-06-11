@@ -138,21 +138,28 @@ public static class Main
         }
 
         // Heals unit that passes through a Stage Station on their path
-        for (int j = 0; j < __instance.Path.Count; j++) {
+        // __instance.Path.Count-1 to exclude starting tile
+        for (int j = 0; j < __instance.Path.Count-1; j++) {
             WorldCoordinates pathCord = __instance.Path[j];
             TileData tile = gameState.Map.GetTile(pathCord);
             
             // Heal 6 for units with at least 15 max health, otherwise 4
-            gameState.GameLogicData.TryGetData(unitState.type, out unitData);
-	        var healAmount = unitData.health >= 15 ? 60 : 40;
+            var maxHealth = unitState.GetMaxHealth(gameState);
+	        var healAmount = maxHealth >= 15 ? 60 : 40;
             // Heal the unit if it passes through a Stage Station owned by the player
-            if (tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("stagestation")) && tile.owner == __instance.PlayerId && unitState.health < unitData.health)
+            if (tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("stagestation")) && tile.owner == __instance.PlayerId)
             {
-                gameState.ActionStack.Add(new HealAction(__instance.PlayerId, targetCord, (ushort)healAmount));
+                if (unitState.health < maxHealth)
+                {
+                    gameState.ActionStack.Add(new HealAction(__instance.PlayerId, targetCord, (ushort)healAmount));
+                }
+                // Add 1 xp to the unit too
+                unitState.xp += 1;            
             }
         }
     }
 
+    // A custom terrain that sits on field tile needs this to render the field sprite
     [HarmonyPostfix]
     [HarmonyPatch(typeof(TerrainRenderer), nameof(TerrainRenderer.UpdateGraphics))]
     private static void TerrainRenderer_UpdateGraphics(TerrainRenderer __instance, Tile tile, TribeType climate, SkinType skin, bool shouldDesaturate)
@@ -174,6 +181,7 @@ public static class Main
         }
     }
 
+    // A convenient method to render the custom terrain sprite on the field tile
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Tile), nameof(Tile.RenderTerrain))]
     private static void Tile_RenderTerrain(Tile __instance, MapRenderContext ctx, SkinVisualsTransientData transientSkinningData)
@@ -188,7 +196,7 @@ public static class Main
 
         __instance.forestRenderer.Sprite = grasslandSprite;
         modLogger.LogInfo("Rendering grassland tile at " + __instance.Data.coordinates);
-         __instance.forestRenderer.gameObject.SetActive(true);
+        __instance.forestRenderer.gameObject.SetActive(true);
         TerrainMaterialHelper.SetSpriteSaturated(__instance.forestRenderer, flag);
     }
 
@@ -196,14 +204,41 @@ public static class Main
     [HarmonyPatch(typeof(GameLogicData), nameof(GameLogicData.CanBuild))]
     private static void GameLogicData_CanBuild(ref bool __result, GameState gameState, TileData tile, PlayerState playerState, ImprovementData improvement)
     {
-        // Allow Stage Station to be built only tile connected by road
+        // Allow Stage Station to be built on only tile with road and connected to city
         if (improvement.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("stage")))
         {
-            if (!tile.hasRoad)
+        // Check connected road until a city is found
+        Queue<TileData> toCheck = new Queue<TileData>();
+        HashSet<TileData> visited = new HashSet<TileData>();
+        toCheck.Enqueue(tile);
+            while (toCheck.Count > 0)
             {
-                __result = false;
-                return;
+                TileData current = toCheck.Dequeue();
+                visited.Add(current);
+
+                // Must be built on grassland with road (tile)
+                if (tile.hasRoad && tile.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland"))
+                {
+                    // And connected to a city of the same owner (current)
+                    if (current.HasImprovement(EnumCache<ImprovementData.Type>.GetType("city")) && current.owner == tile.owner)
+                    {
+                        __result = true;
+                        return;
+                    }
+                }
+
+                Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors = 
+                    MapDataExtensions.GetTileNeighborsSorted(gameState.Map, current.coordinates);
+                foreach (TileData neighbor in neighbors)
+                {
+                    if ((neighbor.hasRoad || neighbor.HasImprovement(EnumCache<ImprovementData.Type>.GetType("city"))) && !visited.Contains(neighbor))
+                    {
+                        toCheck.Enqueue(neighbor);
+                    }
+                }
             }
+        __result = false;
+        return;
         }
 
         // Allow only one Ranch built on a single connected grassland patch from ALL players
@@ -237,63 +272,154 @@ public static class Main
 
     }
 
-
     [HarmonyPostfix]
     [HarmonyPatch(typeof(BuildAction), nameof(BuildAction.ExecuteDefault))]
     private static void BuildAction_ExecuteDefault(BuildAction __instance, GameState gameState)
     {
-        // Upgrade ranch level appropriately
-        TileData tile = gameState.Map.GetTile(__instance.Coordinates);
-	    
-        if (tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("ranch")))
+    TileData tile = gameState.Map.GetTile(__instance.Coordinates);
+	ImprovementData improvementData;
+	PlayerState playerState;
+
+	// Call the level updating function to update population reward (up/down) for city
+    // For improvements that use custom population reward logics (etc.lord)
+	if (tile != null && gameState.GameLogicData.TryGetData(__instance.Type, out improvementData) && gameState.TryGetPlayer(__instance.PlayerId, out playerState))
+        if (improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
         {
-            // Count connected grassland tiles
-            int grasslandCount = 0;
-            Queue<TileData> toCheck = new Queue<TileData>();
-            HashSet<TileData> visited = new HashSet<TileData>();
-            toCheck.Enqueue(tile);
-            while (toCheck.Count > 0)
-            {
-                TileData current = toCheck.Dequeue();
-                visited.Add(current);
-
-                if (current.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland"))
-                {
-                    grasslandCount++;
-                }
-
-                Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors = 
-                    MapDataExtensions.GetTileNeighborsSorted(gameState.Map, current.coordinates);
-                foreach (TileData neighbor in neighbors)
-                {
-                    if (!visited.Contains(neighbor) && neighbor.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland"))
-                    {
-                        toCheck.Enqueue(neighbor);
-                    }
-                }
-            }
-
-            // Upgrade ranch if patch is larger than 1 tile / 3 tiles / 5 tiles
-            modLogger.LogInfo("Grassland patch size: " + grasslandCount);
-            tile.improvement.level = 1;
-            modLogger.LogInfo("Level 1 Ranch");
-            if (grasslandCount >= 3)
-            {
-                tile.improvement.level = 2;
-                modLogger.LogInfo("Level 2 Ranch");
-            }
-            if (grasslandCount >= 5)
-            {
-                tile.improvement.level = 3;
-                modLogger.LogInfo("Level 1 Ranch");
-            }
-            }
+            ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);
+        }
     }
 
     [HarmonyPostfix]
+    [HarmonyPatch(typeof(ActionUtils), nameof(ActionUtils.CalculateImprovementLevel))]
+    private static void ActionUtils_CalculateImprovementLevel(GameState gameState, TileData tile, ref int __result)
+    {
+        // Does it uses any of the custom level up/down logics?
+        if (!gameState.GameLogicData.TryGetData(tile.improvement.type, out ImprovementData improvementData)) return;
+        if (!improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord"))) return;
+
+        int territoryCount = 0;
+        
+        // This is the custom level up/down logic of "lord" ability
+        if (Parse.territory.TryGetValue(tile.improvement.type, out var value))
+        {
+            // What is the terrain type requirement of this improvement?
+            foreach (TerrainRequirements terrainRequirements in improvementData.terrainRequirements)
+            {
+            string typeName = terrainRequirements.terrain.type.GetName();
+                // Count connected tiles of requird terrain type
+                Queue<TileData> toCheck = new Queue<TileData>();
+                HashSet<TileData> visited = new HashSet<TileData>();
+                toCheck.Enqueue(tile);
+                while (toCheck.Count > 0)
+                {
+                    TileData current = toCheck.Dequeue();
+                    visited.Add(current);
+
+                    if (current.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType(typeName))
+                    {
+                        territoryCount++;
+                    }
+
+                    Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors = 
+                        MapDataExtensions.GetTileNeighborsSorted(gameState.Map, current.coordinates);
+                    foreach (TileData neighbor in neighbors)
+                    {
+                        if (!visited.Contains(neighbor) && neighbor.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType(typeName))
+                        {
+                            toCheck.Enqueue(neighbor);
+                        }
+                    }
+                }
+            }
+            // Update level action default gives improvements level 1 at base (?)
+            if (territoryCount >= value[0] && territoryCount < value[1])
+            {
+                __result = 0;
+                modLogger.LogInfo("Level 1");
+            }
+            else if (territoryCount >= value[1] && territoryCount < value[2])
+            {
+                __result = 1;
+                modLogger.LogInfo("Level 2");
+            }
+            else if (territoryCount >= value[2])
+            {
+                __result = 2;
+                modLogger.LogInfo("Level 3");
+            }
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(ImprovementLevelUpAction), nameof(ImprovementLevelUpAction.ExecuteDefault))]
+    private static void ImprovementLevelUpAction_ExecuteDefault(ImprovementLevelUpAction __instance, GameState state)
+    {
+        TileData tile = state.Map.GetTile(__instance.Coordinates);
+        ImprovementState improvement = tile.improvement;
+        ImprovementData improvementData;
+        if (improvement != null) {
+            // Does it uses any of the custom level up/down logics?
+            if (!state.GameLogicData.TryGetData(tile.improvement.type, out improvementData)
+                || !improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord"))) return;
+			    modLogger.LogInfo("ImprovementLevelUpAction is called!");
+                improvement.level += 1;
+            if (improvementData.growthRewards != null && improvementData.growthRewards.Count > 0)
+			{
+                if (Parse.customPopulation.TryGetValue(improvementData.type, out var value))
+                {
+                    modLogger.LogInfo("customPopulation is located!");
+                    int arrayIndex = improvement.level - 1;
+                    if (arrayIndex >= 0 && arrayIndex < value.Length)
+                    {
+                    modLogger.LogInfo(value[arrayIndex]);
+						for (int i = 0; i < value[arrayIndex]; i++)
+						{
+							state.ActionStack.Add(new IncreasePopulationAction(__instance.PlayerId, tile.coordinates, tile.rulingCityCoordinates, 60));
+						}
+                    }
+                }
+            }
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(ImprovementLevelDownAction), nameof(ImprovementLevelDownAction.ExecuteDefault))]
+    private static void ImprovementLevelDownAction_ExecuteDefault(ImprovementLevelUpAction __instance, GameState state)
+    {
+        TileData tile = state.Map.GetTile(__instance.Coordinates);
+        ImprovementState improvement = tile.improvement;
+        ImprovementData improvementData;
+        if (improvement != null) {
+            // Does it uses any of the custom level up/down logics?
+            if (!state.GameLogicData.TryGetData(tile.improvement.type, out improvementData)
+                || !improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord"))) return;
+			    modLogger.LogInfo("ImprovementLevelDownAction is called!");
+                improvement.level -= 1;
+            if (improvementData.growthRewards != null && improvementData.growthRewards.Count > 0)
+			{
+                if (Parse.customPopulation.TryGetValue(improvementData.type, out var value))
+                {
+                    modLogger.LogInfo("customPopulation is located!");
+                    int arrayIndex = improvement.level - 1;
+                    if (arrayIndex >= 0 && arrayIndex < value.Length)
+                    {
+                    int diff = value[arrayIndex] - value[arrayIndex-1];
+                    modLogger.LogInfo(value[arrayIndex] - value[arrayIndex-1]);
+						for (int i = 0; i < diff; i++)
+						{
+							state.ActionStack.Add(new DecreasePopulationAction(__instance.PlayerId, tile.rulingCityCoordinates, 200));
+						}
+                    }
+                }
+            }
+        }
+    }
+    
+
+    // Required for destroying an improvement using customPopulation
+    [HarmonyPostfix]
     [HarmonyPatch(typeof(ImprovementExtensions), nameof(ImprovementExtensions.CalculateImprovementPopulationAtLevel),
-        new Type[] { typeof(ImprovementData), typeof(int) }
-    )]
+        new Type[] { typeof(ImprovementData), typeof(int) })]
     private static void ImprovementExtensions_CalculateImprovementPopulationAtLevel(ImprovementData improvementData, int level,
         ref int __result)
     {
@@ -301,7 +427,7 @@ public static class Main
 
         if (improvementData.maxLevel > 0 && level > 0)
         {
-            modLogger.LogInfo("LevelRewardCalculation running!");
+            modLogger.LogInfo("CalculateImprovementPopulationAtLevel running...");
                 if (Parse.customPopulation.TryGetValue(improvementData.type, out var value))
                 {
                     modLogger.LogInfo("customPopulation is located!");
@@ -321,7 +447,6 @@ public static class Main
                     }
                 }
         }
-
         __result = num;        // This replaces the original return value
     }
 }

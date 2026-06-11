@@ -1,0 +1,20 @@
+"herding": {
+    "cost": 2,
+    "terrainRequirements": [
+        {
+            "resource": "game"
+        }
+    ],
+    "improvementAbilities": [
+        "consumed",
+        "reclaim"
+    ],
+    "maxLevel": 0,
+    "rewards": [
+        {
+            "population": 0
+        }
+    ],
+    "shouldSuggestUnlock": true,
+    "idx": -1
+}

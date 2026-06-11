@@ -37,12 +37,31 @@ public static class Parse
     }*/
 
     public static Dictionary<ImprovementData.Type, int[]> customPopulation = new Dictionary<ImprovementData.Type, int[]>();
+    public static Dictionary<ImprovementData.Type, int[]> territory = new Dictionary<ImprovementData.Type, int[]>();
     
     [HarmonyPrefix]
     [HarmonyPriority(Priority.Last)]
     [HarmonyPatch(typeof(GameLogicData), nameof(GameLogicData.AddGameLogicPlaceholders))]
     private static void GameLogicData_Parse(GameLogicData __instance, JObject rootObject)
     {
-        ParseUtils.ParsePerEach(rootObject, "improvementData", "customPopulation", customPopulation);
+        modLogger.LogInfo("=== Starting parsing ===");
+        
+        ParseUtils.ParsePerEach(rootObject, "improvementData", "customPopulation", customPopulation, 
+                new[] { "growthRewards" });
+        modLogger.LogInfo($"Parsed customPopulation entries: {customPopulation.Count}");
+
+        ParseUtils.ParsePerEach(rootObject, "improvementData", "territory", territory, 
+                new[] { "terrainRequirements" });
+        modLogger.LogInfo($"Parsed territory entries: {territory.Count}");
+        
+        // Debug what we actually have
+        foreach (var kvp in customPopulation)
+        {
+            modLogger.LogInfo($"  → {kvp.Key} = [{string.Join(", ", kvp.Value)}]");
+        }
+        foreach (var kvp in territory)
+        {
+            modLogger.LogInfo($"  → {kvp.Key} = [{string.Join(", ", kvp.Value)}]");
+        }
     }
 }

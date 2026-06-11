@@ -1,45 +1,139 @@
-    public static class ModTileData
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(ActionUtils), nameof(ActionUtils.CalculateImprovementLevel))]
+    private static void ActionUtils_CalculateImprovementLevel(GameState gameState, TileData tile, ref int __result)
     {
-        // Using ConditionalWeakTable to associate custom data (HasTree) with TileData class
-        // Without modifying the original TileData class directly
-        private static readonly ConditionalWeakTable<TileData, TreeState> TreeRegistry = 
-            new ConditionalWeakTable<TileData, TreeState>();
-
-        // ConditionalWeakTable requires a class input
-        // Define custom class (TreeState) to hold HasTree value
-        private class TreeState
+        // Count connected grassland tiles
+        int grasslandCount = 0;
+        Queue<TileData> toCheck = new Queue<TileData>();
+        HashSet<TileData> visited = new HashSet<TileData>();
+        toCheck.Enqueue(tile);
+        while (toCheck.Count > 0)
         {
-            public bool HasTree = false;
-        }
+            TileData current = toCheck.Dequeue();
+            visited.Add(current);
 
-        // Provide a "getter" method for external calls to check if a tile has a tree
-        public static bool get_HasTree(TileData tile)
-        {
-            if (tile == null) return false;
-            return TreeRegistry.GetOrCreateValue(tile).HasTree;
-        }
+            if (current.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland"))
+            {
+                grasslandCount++;
+            }
 
-        // Provide a "setter" method for external calls to set the HasTree value for a tile
-        public static void set_HasTree(TileData tile, bool value)
-        {
-            if (tile == null) return;
-            TreeRegistry.GetOrCreateValue(tile).HasTree = value;
+            Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors = 
+                MapDataExtensions.GetTileNeighborsSorted(gameState.Map, current.coordinates);
+            foreach (TileData neighbor in neighbors)
+            {
+                if (!visited.Contains(neighbor) && neighbor.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland"))
+                {
+                    toCheck.Enqueue(neighbor);
+                }
+            }
         }
+        if (tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("ranch")))
+        {
+            if (grasslandCount >= 1 && grasslandCount < 3)
+            {
+                __result = 1;
+                modLogger.LogInfo("Level 1 Ranch");
+            }
+            if (grasslandCount >= 3 && grasslandCount < 5)
+            {
+                __result = 2;
+                modLogger.LogInfo("Level 2 Ranch");
+            }
+            if (grasslandCount >= 5)
+            {
+                __result = 3;
+                modLogger.LogInfo("Level 3 Ranch");
+            }
+        }            
     }
 
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(ActionUtils), nameof(ActionUtils.KillUnit))]
-    private static void ActionUtils_KillUnit(GameState gameState, TileData tile)
+    [HarmonyPatch(typeof(ImprovementLevelUpAction), nameof(ImprovementLevelUpAction.ExecuteDefault))]
+    private static void ImprovementLevelUpAction_ExecuteDefault(ImprovementLevelUpAction __instance, GameState gameState)
     {
-        // UnitState unitState;
-	    // PlayerState playerState;
-        UnitData unitData;
-	    
-        if (gameState.GameLogicData.TryGetData(tile.unit.type, out unitData))
-        {
-            if (unitData.HasAbility(EnumCache<UnitAbility.Type>.GetType("leaf")))
-            {
-                ModTileData.set_HasTree(tile, true);
+		TileData tile = gameState.Map.GetTile(__instance.Coordinates);
+		if (tile.improvement != null)
+		{
+			ImprovementState improvement = tile.improvement;
+			improvement.level += 1;
+			ImprovementData improvementData;
+			if (gameState.GameLogicData.TryGetData(tile.improvement.type, out improvementData) && improvementData.growthRewards != null && improvementData.growthRewards.Count > 0)
+			{
+                if (Parse.customPopulation.TryGetValue(improvementData.type, out var value))
+                {
+                    modLogger.LogInfo("customPopulation is located!");
+                    int arrayIndex = improvement.level - 1;
+                    if (arrayIndex >= 0 && arrayIndex < value.Length)
+                    {
+                    modLogger.LogInfo(value[arrayIndex]);
+						for (int i = 0; i < value[arrayIndex]; i++)
+						{
+							gameState.ActionStack.Add(new IncreasePopulationAction(__instance.PlayerId, tile.coordinates, tile.rulingCityCoordinates, 60));
+						}
+                    }
+                }
             }
         }
+    }
+
+        [HarmonyPostfix]
+    [HarmonyPatch(typeof(ActionUtils), nameof(ActionUtils.CalculateImprovementLevel))]
+    private static void ActionUtils_CalculateImprovementLevel(GameState gameState, TileData tile, ref int __result)
+    {
+        ImprovementData improvementData;
+        int territoryCount = 0;
+
+        if (gameState.GameLogicData.TryGetData(tile.improvement.type, out improvementData))
+        {
+            // What is the terrain type requirement of this improvement?
+            foreach (TerrainRequirements terrainRequirements in improvementData.terrainRequirements)
+            {
+            string typeName = terrainRequirements.terrain.GetName();
+                // Count connected grassland tiles
+                Queue<TileData> toCheck = new Queue<TileData>();
+                HashSet<TileData> visited = new HashSet<TileData>();
+                toCheck.Enqueue(tile);
+                while (toCheck.Count > 0)
+                {
+                    TileData current = toCheck.Dequeue();
+                    visited.Add(current);
+
+                    if (current.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType(typeName))
+                    {
+                        territoryCount++;
+                    }
+
+                    Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors = 
+                        MapDataExtensions.GetTileNeighborsSorted(gameState.Map, current.coordinates);
+                    foreach (TileData neighbor in neighbors)
+                    {
+                        if (!visited.Contains(neighbor) && neighbor.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType(typeName))
+                        {
+                            toCheck.Enqueue(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (Parse.territory.TryGetValue(tile.improvement.type, out var value) && 
+            gameState.GameLogicData.TryGetData(tile.improvement.type, out improvementData)
+            && improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
+        {
+            if (territoryCount >= value[0] && territoryCount < value[1])
+            {
+                __result = 1;
+                modLogger.LogInfo("Level 1");
+            }
+            if (territoryCount >= value[1] && territoryCount < value[2])
+            {
+                __result = 2;
+                modLogger.LogInfo("Level 2");
+            }
+            if (territoryCount >= value[2])
+            {
+                __result = 3;
+                modLogger.LogInfo("Level 3");
+            }
+        }            
     }
