@@ -384,20 +384,19 @@ public static class Main
                     }
                 }
             }
-            // Update level action default gives improvements level 1 at base (?)
             if (territoryCount >= value[0] && territoryCount < value[1])
             {
-                __result = 0;
+                __result = 0; //idk why 1 not works
                 modLogger.LogInfo("Level 1");
             }
             else if (territoryCount >= value[1] && territoryCount < value[2])
             {
-                __result = 1;
+                __result = 1; //idk why 2 not works
                 modLogger.LogInfo("Level 2");
             }
             else if (territoryCount >= value[2])
             {
-                __result = 2;
+                __result = 2; // idk why 3 not works
                 modLogger.LogInfo("Level 3");
             }
         }
@@ -501,5 +500,32 @@ public static class Main
                 }
         }
         __result = num;        // This replaces the original return value
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(CommandUtils), nameof(CommandUtils.GetTrainableUnits))]
+    private static void CommandUtils_GetTrainableUnits(GameState gameState, PlayerState player, TileData tile, ref List<TrainCommand> __result, bool includeUnavailable = false)
+    {
+        ImprovementData improvementData;
+		List<TrainCommand> list = new List<TrainCommand>();
+        if (tile.improvement != null
+            && gameState.GameLogicData.TryGetData(tile.improvement.type, out improvementData)
+            && improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("ranch")))
+            {
+                modLogger.LogInfo("Ranch is located for training!");
+                foreach (UnitData unitData in gameState.GameLogicData.GetUnlockedUnits(player, gameState, false))
+                {
+                    if (unitData.HasAbility(EnumCache<UnitAbility.Type>.GetType("mercenary")) && CommandValidation.HasUnitTerrain(gameState, tile.coordinates, unitData))
+                    {
+                        TrainCommand trainCommand = new TrainCommand(player.Id, unitData.type, tile.coordinates);
+                        if (!player.blockTrainUnits && (includeUnavailable || trainCommand.IsValid(gameState)))
+                        {
+                            list.Add(trainCommand);
+                        }
+                    }
+                }
+                __result = list;
+                return;
+            }
     }
 }

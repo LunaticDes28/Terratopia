@@ -2,6 +2,12 @@
 	"terrain_grassland": {
 		"English": "Grassland"
 	},
+	"improvement_herding": {
+		"English": "Herd"
+	},
+	"improvement_butching": {
+		"English": "Butch"
+	},
 	"improvement_stagestation": {
 		"English": "Stage Station"
 	},
