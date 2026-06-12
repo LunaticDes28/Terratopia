@@ -280,6 +280,10 @@ public static class Main
             // Check if same city area has grassland tile
             if (gameState.GameLogicData.TryGetData(playerState.tribe, out TribeData tribeData))
             {
+                if (tile == null || !tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("city"))) {
+                    __result = false;
+                    return;
+                }                
                 Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, tile);
                 for (int j = 0; j < cityAreaSorted.Count; j++)
                 {
@@ -319,6 +323,9 @@ public static class Main
             // Herd ability relocates game to nearest grassland within city and turns it into a livestock resource
             if (improvementData.type == EnumCache<ImprovementData.Type>.GetType("herding"))
             {
+                if (tile == null || !tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("city"))) {
+                    return;
+                }                
                 // Check if same city area has grassland tile
                 if (gameState.GameLogicData.TryGetData(playerState.tribe, out TribeData tribeData))
                 {
