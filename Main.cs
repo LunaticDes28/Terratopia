@@ -204,7 +204,7 @@ public static class Main
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(GameLogicData), nameof(GameLogicData.CanBuild))]
-    private static void GameLogicData_CanBuild(ref bool __result, GameState gameState, TileData tile, PlayerState playerState, ImprovementData improvement)
+    private static void GameLogicData_CanBuild(GameLogicData __instance, GameState gameState, TileData tile, PlayerState playerState, ImprovementData improvement, ref bool __result)
     {
         // Allow Stage Station to be built on only tile with road and connected to city
         if (improvement.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("stage")))
@@ -219,6 +219,7 @@ public static class Main
                 visited.Add(current);
 
                 // Must be built on grassland with road (tile)
+                // This custom logic is beyond vanilla logics so no use vanilla methods etc. MeetsRequirement
                 if (tile.hasRoad && tile.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland"))
                 {
                     // And connected to a city of the same owner (current)
@@ -280,7 +281,11 @@ public static class Main
             // Check if same city area has grassland tile
             if (gameState.GameLogicData.TryGetData(playerState.tribe, out TribeData tribeData))
             {
-            if (tile.rulingCityCoordinates != new WorldCoordinates(-1, -1))
+            // Calls original requirement function check
+            if (tile.rulingCityCoordinates != new WorldCoordinates(-1, -1)
+                    && tile.owner == playerState.Id
+                    && __instance.MeetsRequirement(tile, improvement, playerState, gameState)
+                    && __instance.MeetsAdjacencyRequirement(gameState.Map, tile, improvement.adjacencyRequirements))
                 {
                 TileData cityTile = gameState.Map.GetTile(tile.rulingCityCoordinates);             
                 Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, cityTile);
@@ -313,7 +318,7 @@ public static class Main
             // For improvements that use custom population reward logics (etc.lord)
             if (improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
             {
-                ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);
+                //ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);
             }
             // Herd ability relocates game to nearest grassland within city and turns it into a livestock resource
             if (improvementData.type == EnumCache<ImprovementData.Type>.GetType("herding"))
@@ -338,6 +343,10 @@ public static class Main
                         }
                     }
                 }
+            }
+            if (improvementData.type == EnumCache<ImprovementData.Type>.GetType("slaughter"))
+            {
+                tile.unit.xp += 2;
             }
         }
     }
@@ -387,19 +396,25 @@ public static class Main
             }
             if (territoryCount >= value[0] && territoryCount < value[1])
             {
-                __result = 0; //idk why 1 not works
+                __result = 1; //idk why 1 not works
                 modLogger.LogInfo("Level 1");
             }
             else if (territoryCount >= value[1] && territoryCount < value[2])
             {
-                __result = 1; //idk why 2 not works
+                __result = 2; //idk why 2 not works
                 modLogger.LogInfo("Level 2");
             }
             else if (territoryCount >= value[2])
             {
-                __result = 2; // idk why 3 not works
+                __result = 3; // idk why 3 not works
                 modLogger.LogInfo("Level 3");
             }
+            else
+            {
+                __result = 0;
+                modLogger.LogInfo("Level 0");
+            }
+            modLogger.LogInfo("Result is " + __result);
         }
     }
 
@@ -424,10 +439,11 @@ public static class Main
                     int arrayIndex = improvement.level - 1;
                     if (arrayIndex >= 0 && arrayIndex < value.Length)
                     {
-                    modLogger.LogInfo(value[arrayIndex]);
+                    modLogger.LogInfo(value[arrayIndex] + "in level " + improvement.level);
 						for (int i = 0; i < value[arrayIndex]; i++)
 						{
 							state.ActionStack.Add(new IncreasePopulationAction(__instance.PlayerId, tile.coordinates, tile.rulingCityCoordinates, 60));
+                            modLogger.LogInfo("Population increased" + (i+1) + "times");
 						}
                     }
                 }
@@ -437,7 +453,7 @@ public static class Main
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(ImprovementLevelDownAction), nameof(ImprovementLevelDownAction.ExecuteDefault))]
-    private static void ImprovementLevelDownAction_ExecuteDefault(ImprovementLevelUpAction __instance, GameState state)
+    private static void ImprovementLevelDownAction_ExecuteDefault(ImprovementLevelDownAction __instance, GameState state)
     {
         TileData tile = state.Map.GetTile(__instance.Coordinates);
         ImprovementState improvement = tile.improvement;
@@ -461,13 +477,13 @@ public static class Main
 						for (int i = 0; i < diff; i++)
 						{
 							state.ActionStack.Add(new DecreasePopulationAction(__instance.PlayerId, tile.rulingCityCoordinates, 200));
-						}
+                            modLogger.LogInfo("Population decreased" + (i+1) + "times");						
+                        }
                     }
                 }
             }
         }
     }
-    
 
     // Required for destroying an improvement using customPopulation
     [HarmonyPostfix]
