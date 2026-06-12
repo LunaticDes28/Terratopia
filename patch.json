@@ -22,7 +22,7 @@
 			"improvementUnlocks": [
 				"ranch",
 				"herding",
-				"butching"
+				"slaughter"
 			],
 			"abilityUnlocks": [
 			],
@@ -146,7 +146,7 @@
 			"shouldSuggestUnlock": true,
 			"idx": -1
 		},
-		"butching": {
+		"slaughter": {
 			"terrainRequirements": [
 				{
 					"resource": "livestock"

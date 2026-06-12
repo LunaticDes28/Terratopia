@@ -165,7 +165,7 @@ public static class Main
     [HarmonyPatch(typeof(TerrainRenderer), nameof(TerrainRenderer.UpdateGraphics))]
     private static void TerrainRenderer_UpdateGraphics(TerrainRenderer __instance, Tile tile, TribeType climate, SkinType skin, bool shouldDesaturate)
     {
-        SpriteAtlasManager.SpriteLookupResult spriteLookupResult = GameManager.GetSpriteAtlasManager().DoSpriteLookup("ground", climate, skin);
+        SpriteAtlasManager.SpriteLookupResult spriteLookupResult = GameManager.GetSpriteAtlasManager().DoSpriteLookup("ground", climate, skin, false, 0);
         
         TileData tileData = tile.Data;
         if (tileData.terrain != EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland"))
@@ -280,10 +280,9 @@ public static class Main
             // Check if same city area has grassland tile
             if (gameState.GameLogicData.TryGetData(playerState.tribe, out TribeData tribeData))
             {
-                if (tile == null || !tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("city"))) {
-                    __result = false;
-                    return;
-                }                
+            if (tile.rulingCityCoordinates != new WorldCoordinates(-1, -1))
+                {
+                TileData cityTile = gameState.Map.GetTile(tile.rulingCityCoordinates);             
                 Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, tile);
                 for (int j = 0; j < cityAreaSorted.Count; j++)
                 {
@@ -291,13 +290,10 @@ public static class Main
                     if (tileData2.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland")
                         && tileData2.improvement == null && tileData2.resource == null)
                     {
-                        tileData2.resource = new ResourceState
-                        {
-                            type = EnumCache<ResourceData.Type>.GetType("livestock")
-                        };
                         __result = true;
                         break;
                     }
+                }
                 }
             }
         }
@@ -319,17 +315,15 @@ public static class Main
             {
                 ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);
             }
-
             // Herd ability relocates game to nearest grassland within city and turns it into a livestock resource
             if (improvementData.type == EnumCache<ImprovementData.Type>.GetType("herding"))
             {
-                if (tile == null || !tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("city"))) {
-                    return;
-                }                
+            if (tile.rulingCityCoordinates != new WorldCoordinates(-1, -1))
+                {             
+                TileData cityTile = gameState.Map.GetTile(tile.rulingCityCoordinates);
                 // Check if same city area has grassland tile
-                if (gameState.GameLogicData.TryGetData(playerState.tribe, out TribeData tribeData))
-                {
-                    Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, tile);
+                
+                    Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, cityTile);
                     for (int j = 0; j < cityAreaSorted.Count; j++)
                     {
                         TileData tileData2 = cityAreaSorted[j];
@@ -343,7 +337,7 @@ public static class Main
                             break; // only place livestock once for each game herded
                         }
                     }
-                }        
+                }
             }
         }
     }
@@ -517,7 +511,7 @@ public static class Main
 		Il2CppSystem.Collections.Generic.List<TrainCommand> list = new Il2CppSystem.Collections.Generic.List<TrainCommand>();
         if (tile.improvement != null
             && gameState.GameLogicData.TryGetData(tile.improvement.type, out improvementData)
-            && improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("ranch")))
+            && tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("ranch")))
             {
                 modLogger.LogInfo("Ranch is located for training!");
                 foreach (UnitData unitData in gameState.GameLogicData.GetUnlockedUnits(player, gameState, false))
