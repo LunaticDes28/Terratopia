@@ -318,7 +318,8 @@ public static class Main
             // For improvements that use custom population reward logics (etc.lord)
             if (improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
             {
-                //ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);
+                // CheckSurroundingArea in BuildAction already includes checking center tile!!!
+                /*ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);*/
             }
             // Herd ability relocates game to nearest grassland within city and turns it into a livestock resource
             if (improvementData.type == EnumCache<ImprovementData.Type>.GetType("herding"))
@@ -396,17 +397,17 @@ public static class Main
             }
             if (territoryCount >= value[0] && territoryCount < value[1])
             {
-                __result = 1; //idk why 1 not works
+                __result = 1; //
                 modLogger.LogInfo("Level 1");
             }
             else if (territoryCount >= value[1] && territoryCount < value[2])
             {
-                __result = 2; //idk why 2 not works
+                __result = 2; //
                 modLogger.LogInfo("Level 2");
             }
             else if (territoryCount >= value[2])
             {
-                __result = 3; // idk why 3 not works
+                __result = 3; //
                 modLogger.LogInfo("Level 3");
             }
             else
