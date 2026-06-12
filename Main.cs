@@ -165,7 +165,7 @@ public static class Main
     [HarmonyPatch(typeof(TerrainRenderer), nameof(TerrainRenderer.UpdateGraphics))]
     private static void TerrainRenderer_UpdateGraphics(TerrainRenderer __instance, Tile tile, TribeType climate, SkinType skin, bool shouldDesaturate)
     {
-        SpriteAtlasManager.SpriteLookupResult spriteLookupResult = GameManager.GetSpriteAtlasManager().DoSpriteLookup("ground", climate, skin, false, 0);
+        SpriteAtlasManager.SpriteLookupResult spriteLookupResult = GameManager.GetSpriteAtlasManager().DoSpriteLookup("ground", climate, skin);
         
         TileData tileData = tile.Data;
         if (tileData.terrain != EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland"))
@@ -283,7 +283,7 @@ public static class Main
             if (tile.rulingCityCoordinates != new WorldCoordinates(-1, -1))
                 {
                 TileData cityTile = gameState.Map.GetTile(tile.rulingCityCoordinates);             
-                Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, tile);
+                Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(gameState, cityTile);
                 for (int j = 0; j < cityAreaSorted.Count; j++)
                 {
                     TileData tileData2 = cityAreaSorted[j];
