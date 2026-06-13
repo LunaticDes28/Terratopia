@@ -70,7 +70,7 @@
 		}
 	},
 	"unitData": {
-		"rider": {
+		"grassrider": {
 			"health": 100,
 			"defence": 10,
 			"movement": 2,
@@ -80,31 +80,34 @@
 			"unitAbilities": [
 				"dash",
 				"escape",
-				"fortify",
 				"mercenary",
+				"unique",
 				"land"
 			],
 			"weapon": 1,
 			"promotionLimit": 3,
-			"idx": 3
+			"idx": -1,
+			"prefab": "rider"
 		},
 		"sentinel": {
 			"health": 100,
 			"defence": 10,
 			"movement": 2,
-			"range": 1,
-			"attack": 20,
-			"cost": 3,
+			"range": 2,
+			"attack": 15,
+			"cost": 5,
 			"unitAbilities": [
 				"dash",
 				"escape",
-				"fortify",
+				"guard",
 				"mercenary",
+				"unique",
 				"land"
 			],
-			"weapon": 1,
+			"weapon": 3,
 			"promotionLimit": 3,
-			"idx": -1
+			"idx": -1,
+			"prefab": "rider"
 		}
 	},
 	"improvementData": {
@@ -219,6 +222,9 @@
 	"taskData": {},
 	"tribeAbility": {},
 	"unitAbility": {
+		"guard": {
+			"idx": -1
+		},
 		"mercenary": {
 			"idx": -1
 		}

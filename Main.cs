@@ -157,6 +157,22 @@ public static class Main
                 unitState.xp += 1;            
             }
         }
+
+        // A unit moving into 3x3 area of a unit with guard ability triggers guard retaliation
+        TileData[] areaSorted = gameState.Map.GetAreaSorted(targetCord, 2, true, true);
+		foreach (TileData tileData in areaSorted)
+        {
+            if (tileData.unit != null
+                && tileData.unit.owner != __instance.PlayerId
+                && tileData.unit.HasAbility(EnumCache<UnitAbility.Type>.GetType("guard")))
+            {
+                // Own damage calculation logic :D
+                var guardBase = 20 + (tileData.unit.GetDefence(gameState) * 2); 
+                var guardBonus = unitState.GetMaxHealth(gameState) >= 15 ? 1.5f : 1;
+                int guardDamage = (int)(guardBase * guardBonus);
+                gameState.ActionStack.Add(new AttackAction(__instance.PlayerId, tileData.coordinates, targetCord, guardDamage, false, AttackAction.AnimationType.Normal, 100));
+            }
+        }
     }
 
     // Thanks for klipi
@@ -318,8 +334,7 @@ public static class Main
             // For improvements that use custom population reward logics (etc.lord)
             if (improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
             {
-                // CheckSurroundingArea in BuildAction already includes checking center tile!!!
-                /*ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);*/
+                ActionUtils.UpdateImprovementLevel(gameState, __instance.PlayerId, tile);
             }
             // Herd ability relocates game to nearest grassland within city and turns it into a livestock resource
             if (improvementData.type == EnumCache<ImprovementData.Type>.GetType("herding"))
@@ -398,24 +413,25 @@ public static class Main
             if (territoryCount >= value[0] && territoryCount < value[1])
             {
                 __result = 1; //
-                modLogger.LogInfo("Level 1");
+                modLogger.LogInfo("Level 1 " + tile.improvement.level);
             }
             else if (territoryCount >= value[1] && territoryCount < value[2])
             {
                 __result = 2; //
-                modLogger.LogInfo("Level 2");
+                modLogger.LogInfo("Level 2 "  + tile.improvement.level);
             }
             else if (territoryCount >= value[2])
             {
                 __result = 3; //
-                modLogger.LogInfo("Level 3");
+                modLogger.LogInfo("Level 3 " + tile.improvement.level);
             }
             else
             {
                 __result = 0;
-                modLogger.LogInfo("Level 0");
+                modLogger.LogInfo("Level 0 " + tile.improvement.level);
             }
             modLogger.LogInfo("Result is " + __result);
+            return;
         }
     }
 
@@ -427,11 +443,13 @@ public static class Main
         ImprovementState improvement = tile.improvement;
         ImprovementData improvementData;
         if (improvement != null) {
+            modLogger.LogInfo("Initiate " + tile.improvement.level);
             // Does it uses any of the custom level up/down logics?
             if (!state.GameLogicData.TryGetData(tile.improvement.type, out improvementData)
                 || !improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord"))) return;
 			    modLogger.LogInfo("ImprovementLevelUpAction is called!");
                 improvement.level += 1;
+                modLogger.LogInfo("Proceed " + tile.improvement.level);
             if (improvementData.growthRewards != null && improvementData.growthRewards.Count > 0)
 			{
                 if (Parse.customPopulation.TryGetValue(improvementData.type, out var value))
@@ -440,7 +458,7 @@ public static class Main
                     int arrayIndex = improvement.level - 1;
                     if (arrayIndex >= 0 && arrayIndex < value.Length)
                     {
-                    modLogger.LogInfo(value[arrayIndex] + "in level " + improvement.level);
+                    modLogger.LogInfo(value[arrayIndex] + " in level " + improvement.level);
 						for (int i = 0; i < value[arrayIndex]; i++)
 						{
 							state.ActionStack.Add(new IncreasePopulationAction(__instance.PlayerId, tile.coordinates, tile.rulingCityCoordinates, 60));
@@ -531,7 +549,7 @@ public static class Main
             && tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("ranch")))
             {
                 modLogger.LogInfo("Ranch is located for training!");
-                foreach (UnitData unitData in gameState.GameLogicData.GetUnlockedUnits(player, gameState, false))
+                /*foreach (UnitData unitData in gameState.GameLogicData.)
                 {
                     if (unitData.HasAbility(EnumCache<UnitAbility.Type>.GetType("mercenary")) && CommandValidation.HasUnitTerrain(gameState, tile.coordinates, unitData))
                     {
@@ -541,6 +559,20 @@ public static class Main
                             list.Add(trainCommand);
                         }
                     }
+                }*/
+			    UnitData unitData;
+                List<UnitData> units = new List<UnitData>();
+                gameState.GameLogicData.TryGetData(EnumCache<UnitData.Type>.GetType("grassrider"), out unitData);
+                units.Add(unitData);
+                gameState.GameLogicData.TryGetData(EnumCache<UnitData.Type>.GetType("sentinel"), out unitData);
+                units.Add(unitData);
+                foreach (UnitData unit in units)
+                {
+                    TrainCommand trainCommand = new TrainCommand(player.Id, unit.type, tile.coordinates);
+                            if (!player.blockTrainUnits && (includeUnavailable || trainCommand.IsValid(gameState)))
+                            {
+                                list.Add(trainCommand);
+                            }
                 }
                 __result = list;
                 return;

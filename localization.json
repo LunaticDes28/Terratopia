@@ -2,6 +2,9 @@
 	"terrain_grassland": {
 		"English": "Grassland"
 	},
+	"resource_names_livestock": {
+		"English": "Livestock"
+	},
 	"improvement_herding": {
 		"English": "Herd"
 	},
@@ -14,7 +17,37 @@
 	"improvement_ranch": {
 		"English": "Ranch"
 	},
+	"building_names_herding": {
+		"English": "Herd"
+	},
+	"building_names_slaughter": {
+		"English": "Slaughter"
+	},
+	"building_names_stagestation": {
+		"English": "Stage Station"
+	},
+	"building_names_ranch": {
+		"English": "Ranch"
+	},
 	"technology_names_pastoralism": {
 		"English": "Pastoralism"
+	},
+	"unit_abilities_guard": {
+		"English": "Guard"
+	},	
+	"tooltip_ability_guard": {
+		"English": "This unit retaliates when an enemy unit enters its range."
+	},
+	"unit_abilities_mercenary": {
+		"English": "Mercenary"
+	},	
+	"tooltip_ability_mercenary": {
+		"English": "This unit can be trained from ranches."
+	},
+	"unit_names_grassrider": {
+		"English": "Rider"
+	},
+	"unit_names_sentinel": {
+		"English": "Sentinel"
 	}
 }
