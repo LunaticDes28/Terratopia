@@ -33,13 +33,13 @@
 		"English": "Pastoralism"
 	},
 	"unit_abilities_guard": {
-		"English": "Guard"
+		"English": "GUARD"
 	},	
 	"tooltip_ability_guard": {
 		"English": "This unit retaliates when an enemy unit enters its range."
 	},
 	"unit_abilities_mercenary": {
-		"English": "Mercenary"
+		"English": "MERCENARY"
 	},	
 	"tooltip_ability_mercenary": {
 		"English": "This unit can be trained from ranches."
