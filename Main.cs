@@ -4,6 +4,7 @@ using Polytopia.Data;
 using UnityEngine;
 using PolytopiaBackendBase.Common;
 using Terratopia.Parser;
+using UnityEngine.Rendering.Universal.Internal;
 
 
 namespace Terratopia;
@@ -46,12 +47,12 @@ public static class Main
 
         foreach (TileData tile in map.tiles)
         {
-            modLogger.LogInfo("Attempting to spawn grassland!");
+            // modLogger.LogInfo("Attempting to spawn grassland!");
             
             // Only consider field tiles for patch centers
             if (tile.terrain != EnumCache<Polytopia.Data.TerrainData.Type>.GetType("field"))
                 continue;
-            modLogger.LogInfo("A valid field tile is found!");
+            // modLogger.LogInfo("A valid field tile is found!");
 
             if (rand.NextDouble() < START_CHANCE)
             {
@@ -145,7 +146,7 @@ public static class Main
             
             // Heal 6 for units with at least 15 max health, otherwise 4
             var maxHealth = unitState.GetMaxHealth(gameState);
-	        var healAmount = maxHealth >= 15 ? 60 : 40;
+	        var healAmount = maxHealth >= 150 ? 60 : 40;
             // Heal the unit if it passes through a Stage Station owned by the player
             if (tile.HasImprovement(EnumCache<ImprovementData.Type>.GetType("stagestation")) && tile.owner == __instance.PlayerId)
             {
@@ -167,9 +168,9 @@ public static class Main
                 && tileData.unit.HasAbility(EnumCache<UnitAbility.Type>.GetType("guard")))
             {
                 // Own damage calculation logic :D
-                var guardBase = 20 + (tileData.unit.GetDefence(gameState) * 2); 
-                var guardBonus = unitState.GetMaxHealth(gameState) >= 15 ? 1.5f : 1;
-                int guardDamage = (int)(guardBase * guardBonus);
+                var guardBase = 20 + (tileData.unit.GetDefence(gameState) * 20); 
+                var guardBonus = unitState.GetMaxHealth(gameState) >= 150 ? 1.5f : 1;
+                int guardDamage = (int)Math.Round(Math.Min(guardBase * guardBonus, unitState.health) / 10);
                 gameState.ActionStack.Add(new AttackAction(__instance.PlayerId, tileData.coordinates, targetCord, guardDamage, false, AttackAction.AnimationType.Normal, 100));
             }
         }
@@ -466,11 +467,13 @@ private static bool ActionUtils_CalculateImprovementLevel(GameState gameState, T
 
             // Update level
             tile.improvement.level = (ushort)newLevel;
+            modLogger.LogInfo("Final level prefix: " + tile.improvement.level);
+            // tile.improvement.level += 1;
+            // modLogger.LogInfo("Final level postfix: " + tile.improvement.level);
         }
     }
 
-    // Force return 0 so base game does not interfere with custom lord logic
-    __result = 0;
+    __result = tile.improvement.level;
 
     // IMPORTANT: Return false to SKIP the original method
     return false;
@@ -588,7 +591,7 @@ private static bool ActionUtils_CalculateImprovementLevel(GameState gameState, T
                             if (!player.blockTrainUnits && (includeUnavailable || trainCommand.IsValid(gameState)))
                             {
                                 list.Add(trainCommand);
-                                modLogger.LogMessage($"Added {unit.type} to train list on {tile.improvement.type}");
+                                modLogger.LogInfo($"Added {unit.type} to train list on {tile.improvement.type}");
                             }
                 }
                 __result = list;
