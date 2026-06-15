@@ -28,7 +28,7 @@ public static class Main
         TileData tile = gameState.Map.GetTile(player.startTile);
         PlayerState playerState;
         gameState.TryGetPlayer(player.Id, out playerState);
-		gameState.ActionStack.Add(new IncreaseCurrencyAction(player.Id, tile.coordinates, 1000, 10));
+		// gameState.ActionStack.Add(new IncreaseCurrencyAction(player.Id, tile.coordinates, 1000, 10));
     }
 
     [HarmonyPostfix]
