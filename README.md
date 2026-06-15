@@ -1,5 +1,5 @@
-﻿# Militas
-![](https://img.shields.io/github/downloads/johnklipi/Militas/total)
+﻿# Terratopia
+![](https://img.shields.io/github/downloads/LunaticDes28/Terratopia/total)
 ## Requirements
 
 - Polymod
