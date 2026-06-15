@@ -160,7 +160,7 @@ public static class Main
         }
 
         // A unit moving into 3x3 area of a unit with guard ability triggers guard retaliation
-        TileData[] areaSorted = gameState.Map.GetAreaSorted(targetCord, 2, true, true);
+        TileData[] areaSorted = gameState.Map.GetAreaSorted(targetCord, 1, true, true);
 		foreach (TileData tileData in areaSorted)
         {
             if (tileData.unit != null
