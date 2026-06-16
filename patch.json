@@ -81,7 +81,6 @@
 				"dash",
 				"escape",
 				"mercenary",
-				"unique",
 				"land"
 			],
 			"weapon": 1,
@@ -101,7 +100,6 @@
 				"escape",
 				"guard",
 				"mercenary",
-				"unique",
 				"land"
 			],
 			"weapon": 3,
@@ -185,7 +183,7 @@
 			"terrainRequirements": [
 				{
 					"terrain": "grassland",
-					"territory": [1,3,5]
+					"territory": [1,3,6]
 				}
 			],
 			"improvementAbilities": [
@@ -204,7 +202,7 @@
 				{
 					"score": 0,
 					"population": 0,
-					"customPopulation": [3,5,6]
+					"customPopulation": [2,4,7]
 				}
 			]
 		}

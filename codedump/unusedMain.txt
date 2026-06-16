@@ -393,3 +393,133 @@
         // Force return 0 so base game does not interfere
         __result = 0;
     }
+
+                    for (int j = 0; j < state.Map.Tiles.Length; j++)
+                    {
+                        TileData tileData = state.Map.Tiles[j];
+                        if (tileData.unit != null && tileData.unit.owner == __instance.PlayerId && tileData.unit.type == unitData.type)
+                        {
+                            flag = true;
+                            break;
+                        }
+                    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(MapGenerator), nameof(MapGenerator.AddTerrain))]
+    private static void MapGenerator_AddTerrain(MapData map, List<PlayerState> playerStates, int version, MapGeneratorSettings settings, List<int> landTileIndices)
+    {
+        modLogger.LogInfo("AddTerrain called!");
+
+        System.Random rand = new System.Random();
+
+        const float START_CHANCE = 0.15f;           // Chance to start a new patch
+        const float SPREAD_CHANCE = 0.85f;           // Chance to spread inside patch
+        const int MIN_DISTANCE_BETWEEN_PATCHES = 2;  // Prevents overcrowding
+
+        List<TileData> patchCenters = new List<TileData>();
+
+        foreach (TileData tile in map.tiles)
+        {
+            // modLogger.LogInfo("Attempting to spawn grassland!");
+            
+            // Only consider field tiles for patch centers
+            if (tile.terrain != EnumCache<Polytopia.Data.TerrainData.Type>.GetType("field"))
+                continue;
+            // modLogger.LogInfo("A valid field tile is found!");
+
+            if (rand.NextDouble() < START_CHANCE)
+            {
+                CreateGrasslandPatch(map, tile, rand, SPREAD_CHANCE, patchCenters, MIN_DISTANCE_BETWEEN_PATCHES);
+                patchCenters.Add(tile);
+            }
+        }
+    }
+
+    private static bool CreateGrasslandPatch(MapData map, TileData center, System.Random rand,
+        float spreadChance, List<TileData> patchCenters, int minDistance)
+    {
+        // Check distance to other patches
+        /*var cenPos = center.coordinates;
+        foreach (TileData existing in patchCenters)
+        {
+            var exisPos = existing.coordinates;
+            int dist = MapDataExtensions.ChebyshevDistance(cenPos, exisPos);
+            if (dist < minDistance) return false;
+            modLogger.LogInfo("Tile " + center + " is " + dist + " tiles away from patch center " + existing);
+        }*/
+
+        modLogger.LogInfo("A new grassland patch is attempted at " + center);
+        modLogger.LogInfo("Current number of grassland patches: " + patchCenters.Count);
+
+        // Place center
+        PlaceGrassland(map, center, "center");
+
+        // Spread to nearby tiles (3x3)
+        Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors = 
+        MapDataExtensions.GetTileNeighborsSorted(map, center.coordinates);
+        
+        foreach (TileData neighbor in neighbors)
+        {
+                // Only spread to valid field tiles
+                if (neighbor.terrain != EnumCache<Polytopia.Data.TerrainData.Type>.GetType("field"))
+                    continue;
+
+                if (rand.NextDouble() < spreadChance)
+                {
+                    PlaceGrassland(map, neighbor, "spread");
+                }
+        }
+
+        return true;
+    }
+
+    private static void PlaceGrassland(MapData map, TileData tile, string type)
+    {
+        if (tile == null) return;
+
+        // Skip tiles too close to any village (3x3 area)
+                var tilePos = tile.coordinates;
+                WorldCoordinates cityPos = map.ClosestCity(tilePos, 0);
+                var dist = MapDataExtensions.ChebyshevDistance(tilePos, cityPos);
+                if (dist < 2) return;
+        
+        // Skip tiles in any empire
+        if (tile.owner != 0) return;
+
+        // Set terrain to grassland
+        tile.terrain = EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland");
+        
+        if (type == "center") {modLogger.LogInfo("A new grassland center is placed at " + tile);}
+        if (type == "spread") {modLogger.LogInfo("A new grassland spread is placed at " + tile);}
+    }
+
+   /*[HarmonyPostfix]
+    [HarmonyPatch(typeof(BuildAction), nameof(BuildAction.ExecuteDefault))]
+    private static void BuildAction_ExecuteDefault2(BuildAction __instance, GameState state)
+    {
+        TileData tile = state.Map.GetTile(__instance.Coordinates);
+
+        var cityTiles = new Il2CppSystem.Collections.Generic.List<TileData>();
+        var connectedCities = new Il2CppSystem.Collections.Generic.List<TileData>();
+        cityTiles.Add(state.Map.GetTile(tile.rulingCityCoordinates));
+
+        PlayerState playerState;
+        if (state.TryGetPlayer(__instance.PlayerId, out playerState))
+        {
+            ActionUtils.UpdateCityConnections(state, playerState, cityTiles, connectedCities);
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(ActionUtils), nameof(ActionUtils.PerformConnectedCityChanges))]
+    private static void ActionUtils_PerformConnectedCityChanges(GameState gameState, byte playerId, List<TileData> cityTiles, List<TileData> connectedCities)
+    {   
+        if (cityTiles == null) return;
+		foreach (TileData tileData in cityTiles)
+		{
+			if (tileData.improvement.type == EnumCache<ImprovementData.Type>.GetType("castle"))
+			{
+				gameState.ActionStack.Add(new ConnectCityAction(playerId, tileData.coordinates));
+            }
+		}
+    }*/

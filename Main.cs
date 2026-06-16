@@ -35,66 +35,95 @@ public static class Main
     [HarmonyPatch(typeof(MapGenerator), nameof(MapGenerator.AddTerrain))]
     private static void MapGenerator_AddTerrain(MapData map, List<PlayerState> playerStates, int version, MapGeneratorSettings settings, List<int> landTileIndices)
     {
-        modLogger.LogInfo("AddTerrain called!");
+        modLogger.LogInfo("AddTerrain called! Starting controlled grassland patch generation.");
 
         System.Random rand = new System.Random();
 
-        const float START_CHANCE = 0.15f;           // Chance to start a new patch
-        const float SPREAD_CHANCE = 0.85f;           // Chance to spread inside patch
-        const int MIN_DISTANCE_BETWEEN_PATCHES = 2;  // Prevents overcrowding
+        const float SPREAD_CHANCE = 0.80f;
+        const int MIN_DISTANCE_BETWEEN_PATCHES = 3;
 
         List<TileData> patchCenters = new List<TileData>();
+        List<TileData> candidateFields = new List<TileData>();
 
+        // We only want to generate grassland on field tiles
         foreach (TileData tile in map.tiles)
         {
-            // modLogger.LogInfo("Attempting to spawn grassland!");
-            
-            // Only consider field tiles for patch centers
-            if (tile.terrain != EnumCache<Polytopia.Data.TerrainData.Type>.GetType("field"))
-                continue;
-            // modLogger.LogInfo("A valid field tile is found!");
-
-            if (rand.NextDouble() < START_CHANCE)
+            if (tile.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType("field") &&
+                tile.owner == 0)
             {
-                CreateGrasslandPatch(map, tile, rand, SPREAD_CHANCE, patchCenters, MIN_DISTANCE_BETWEEN_PATCHES);
-                patchCenters.Add(tile);
+                candidateFields.Add(tile);
             }
         }
+
+        // How many grassland patches in map is based on field tiles count
+        int targetPatchCount = GetTargetPatchCount(candidateFields.Count);
+
+        modLogger.LogInfo($"Found {candidateFields.Count} candidate field tiles. Targeting {targetPatchCount} grassland patches.");
+
+        // Shuffle for randomness
+        candidateFields = candidateFields.OrderBy(t => rand.Next()).ToList();
+
+        int patchesPlaced = 0;
+
+        foreach (TileData candidate in candidateFields)
+        {
+            if (patchesPlaced >= targetPatchCount) break;
+
+            // Minimum distance between patches
+            bool tooClose = false;
+            foreach (TileData existing in patchCenters)
+            {
+                int dist = MapDataExtensions.ChebyshevDistance(candidate.coordinates, existing.coordinates);
+                if (dist < MIN_DISTANCE_BETWEEN_PATCHES)
+                {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (tooClose) continue;
+
+            // Avoid being too close to starting cities
+            WorldCoordinates closestCity = map.ClosestCity(candidate.coordinates, 0);
+            if (MapDataExtensions.ChebyshevDistance(candidate.coordinates, closestCity) < 3) continue;
+
+            // Avoid map edges
+            if (MapDataExtensions.DistanceToEdge(map, candidate.coordinates) < 4) continue;
+
+            // Create the patch and add to list for counting and dist checking
+            if (CreateGrasslandPatch(map, candidate, rand, SPREAD_CHANCE, patchCenters, MIN_DISTANCE_BETWEEN_PATCHES))
+            {
+                patchCenters.Add(candidate);
+                patchesPlaced++;
+                modLogger.LogInfo($"Placed grassland patch #{patchesPlaced} at {candidate.coordinates}");
+            }
+        }
+
+        modLogger.LogInfo($"Grassland generation finished. Placed {patchesPlaced}/{targetPatchCount} patches.");
+    }
+
+    // All map sizes uses the same density formula
+    private static int GetTargetPatchCount(int totalTiles)
+    {
+        return Math.Clamp(totalTiles / 5, 4, 60);
     }
 
     private static bool CreateGrasslandPatch(MapData map, TileData center, System.Random rand,
         float spreadChance, List<TileData> patchCenters, int minDistance)
     {
-        // Check distance to other patches
-        /*var cenPos = center.coordinates;
-        foreach (TileData existing in patchCenters)
-        {
-            var exisPos = existing.coordinates;
-            int dist = MapDataExtensions.ChebyshevDistance(cenPos, exisPos);
-            if (dist < minDistance) return false;
-            modLogger.LogInfo("Tile " + center + " is " + dist + " tiles away from patch center " + existing);
-        }*/
-
-        modLogger.LogInfo("A new grassland patch is attempted at " + center);
-        modLogger.LogInfo("Current number of grassland patches: " + patchCenters.Count);
-
-        // Place center
         PlaceGrassland(map, center, "center");
 
+        var neighbors = MapDataExtensions.GetTileNeighborsSorted(map, center.coordinates);
+
         // Spread to nearby tiles (3x3)
-        Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors = 
-        MapDataExtensions.GetTileNeighborsSorted(map, center.coordinates);
-        
         foreach (TileData neighbor in neighbors)
         {
-                // Only spread to valid field tiles
-                if (neighbor.terrain != EnumCache<Polytopia.Data.TerrainData.Type>.GetType("field"))
-                    continue;
+            if (neighbor.terrain != EnumCache<Polytopia.Data.TerrainData.Type>.GetType("field"))
+                continue;
 
-                if (rand.NextDouble() < spreadChance)
-                {
-                    PlaceGrassland(map, neighbor, "spread");
-                }
+            if (rand.NextDouble() < spreadChance)
+            {
+                PlaceGrassland(map, neighbor, "spread");
+            }
         }
 
         return true;
@@ -105,19 +134,16 @@ public static class Main
         if (tile == null) return;
 
         // Skip tiles too close to any village (3x3 area)
-                var tilePos = tile.coordinates;
-                WorldCoordinates cityPos = map.ClosestCity(tilePos, 0);
-                var dist = MapDataExtensions.ChebyshevDistance(tilePos, cityPos);
-                if (dist < 2) return;
-        
-        // Skip tiles in any empire
+        var tilePos = tile.coordinates;
+        if (MapDataExtensions.ChebyshevDistance(tilePos, map.ClosestCity(tilePos, 0)) < 2) return;
         if (tile.owner != 0) return;
 
-        // Set terrain to grassland
         tile.terrain = EnumCache<Polytopia.Data.TerrainData.Type>.GetType("grassland");
-        
-        if (type == "center") {modLogger.LogInfo("A new grassland center is placed at " + tile);}
-        if (type == "spread") {modLogger.LogInfo("A new grassland spread is placed at " + tile);}
+
+        if (type == "center")
+            modLogger.LogInfo("Grassland center placed at " + tile.coordinates);
+        if (type == "spread")
+            modLogger.LogInfo("Grassland spread placed at " + tile.coordinates);
     }
 
     [HarmonyPostfix]
@@ -155,7 +181,7 @@ public static class Main
                     gameState.ActionStack.Add(new HealAction(__instance.PlayerId, targetCord, (ushort)healAmount));
                 }
                 // Add 1 xp to the unit too
-                unitState.xp += 1;            
+                // unitState.xp += 1;            
             }
         }
 
@@ -169,7 +195,7 @@ public static class Main
             {
                 // Own damage calculation logic :D
                 var guardBase = 20 + (tileData.unit.GetDefence(gameState) * 20); 
-                var guardBonus = unitState.GetMaxHealth(gameState) >= 150 ? 1.5f : 1;
+                var guardBonus = unitState.GetMaxHealth(gameState) >=  200 | unitState.promotionLevel > 0 ? 1.5f : 1;
                 int guardDamage = (int)Math.Round(Math.Min(guardBase * guardBonus, unitState.health) / 10);
                 gameState.ActionStack.Add(new AttackAction(__instance.PlayerId, tileData.coordinates, targetCord, guardDamage, false, AttackAction.AnimationType.Normal, 100));
             }
@@ -368,116 +394,116 @@ public static class Main
             }
             if (improvementData.type == EnumCache<ImprovementData.Type>.GetType("slaughter"))
             {
-                tile.unit.xp += 2;
+                tile.unit.xp += 3;
             }
         }
     }
 
-[HarmonyPrefix]
-[HarmonyPatch(typeof(ActionUtils), nameof(ActionUtils.CalculateImprovementLevel))]
-private static bool ActionUtils_CalculateImprovementLevel(GameState gameState, TileData tile, ref int __result)
-{
-    // Early exit - only handle improvements with "lord" ability
-    if (!gameState.GameLogicData.TryGetData(tile.improvement.type, out ImprovementData improvementData))
-        return true; // let original method run
-
-    if (!improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
-        return true; // let original method run
-
-    // === Territory-based leveling ===
-    if (Parse.territory.TryGetValue(tile.improvement.type, out var territoryReq) &&
-        territoryReq != null && territoryReq.Length > 0)
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(ActionUtils), nameof(ActionUtils.CalculateImprovementLevel))]
+    private static bool ActionUtils_CalculateImprovementLevel(GameState gameState, TileData tile, ref int __result)
     {
-        // Count connected tiles of the required terrain type
-        int territoryCount = 0;
+        // Early exit - only handle improvements with "lord" ability
+        if (!gameState.GameLogicData.TryGetData(tile.improvement.type, out ImprovementData improvementData))
+            return true; // let original method run
 
-        foreach (TerrainRequirements terrainRequirements in improvementData.terrainRequirements)
+        if (!improvementData.HasAbility(EnumCache<ImprovementAbility.Type>.GetType("lord")))
+            return true; // let original method run
+
+        // === Territory-based leveling ===
+        if (Parse.territory.TryGetValue(tile.improvement.type, out var territoryReq) &&
+            territoryReq != null && territoryReq.Length > 0)
         {
-            string typeName = terrainRequirements.terrain.type.GetName();
-            Queue<TileData> toCheck = new Queue<TileData>();
-            HashSet<TileData> visited = new HashSet<TileData>();
+            // Count connected tiles of the required terrain type
+            int territoryCount = 0;
 
-            toCheck.Enqueue(tile);
-
-            while (toCheck.Count > 0)
+            foreach (TerrainRequirements terrainRequirements in improvementData.terrainRequirements)
             {
-                TileData current = toCheck.Dequeue();
-                if (!visited.Add(current)) continue;
+                string typeName = terrainRequirements.terrain.type.GetName();
+                Queue<TileData> toCheck = new Queue<TileData>();
+                HashSet<TileData> visited = new HashSet<TileData>();
 
-                if (current.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType(typeName))
+                toCheck.Enqueue(tile);
+
+                while (toCheck.Count > 0)
                 {
-                    territoryCount++;
-                }
+                    TileData current = toCheck.Dequeue();
+                    if (!visited.Add(current)) continue;
 
-                Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors =
-                    MapDataExtensions.GetTileNeighborsSorted(gameState.Map, current.coordinates);
-
-                foreach (TileData neighbor in neighbors)
-                {
-                    if (!visited.Contains(neighbor) &&
-                        neighbor.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType(typeName))
+                    if (current.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType(typeName))
                     {
-                        toCheck.Enqueue(neighbor);
+                        territoryCount++;
                     }
-                }
-            }
-        }
 
-        // Calculate desired level
-        int newLevel = 0;
-        for (int i = 1; i <= territoryReq.Length; i++)
-        {
-            if (territoryCount < territoryReq[i - 1])
-                break;
-            newLevel = i;
-        }
+                    Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<TileData> neighbors =
+                        MapDataExtensions.GetTileNeighborsSorted(gameState.Map, current.coordinates);
 
-        int currentLevel = tile.improvement.level;
-
-        // Only process if level actually needs to change
-        if (newLevel != currentLevel)
-        {
-            if (Parse.customPopulation.TryGetValue(improvementData.type, out var popAtLevel) &&
-                popAtLevel != null && popAtLevel.Length > 0)
-            {
-                int oldPop = (currentLevel > 0 && currentLevel <= popAtLevel.Length) ? popAtLevel[currentLevel - 1] : 0;
-                int newPop = (newLevel > 0 && newLevel <= popAtLevel.Length) ? popAtLevel[newLevel - 1] : 0;
-
-                int delta = newPop - oldPop;
-
-                modLogger.LogInfo($"Lord improvement level changed: {currentLevel} → {newLevel} | Territory: {territoryCount} | Pop delta: {delta}");
-
-                if (delta > 0)
-                {
-                    modLogger.LogInfo($"Adding {delta} population");
-                    for (int j = 0; j < delta; j++)
+                    foreach (TileData neighbor in neighbors)
                     {
-                        gameState.ActionStack.Add(new IncreasePopulationAction(tile.owner, tile.coordinates, tile.rulingCityCoordinates, 60));
-                    }
-                }
-                else if (delta < 0)
-                {
-                    modLogger.LogInfo($"Removing {-delta} population");
-                    for (int j = 0; j < -delta; j++)
-                    {
-                        gameState.ActionStack.Add(new DecreasePopulationAction(tile.owner, tile.rulingCityCoordinates, 200));
+                        if (!visited.Contains(neighbor) &&
+                            neighbor.terrain == EnumCache<Polytopia.Data.TerrainData.Type>.GetType(typeName))
+                        {
+                            toCheck.Enqueue(neighbor);
+                        }
                     }
                 }
             }
 
-            // Update level
-            tile.improvement.level = (ushort)newLevel;
-            modLogger.LogInfo("Final level prefix: " + tile.improvement.level);
-            // tile.improvement.level += 1;
-            // modLogger.LogInfo("Final level postfix: " + tile.improvement.level);
+            // Calculate desired level
+            int newLevel = 0;
+            for (int i = 1; i <= territoryReq.Length; i++)
+            {
+                if (territoryCount < territoryReq[i - 1])
+                    break;
+                newLevel = i;
+            }
+
+            int currentLevel = tile.improvement.level;
+
+            // Only process if level actually needs to change
+            if (newLevel != currentLevel)
+            {
+                if (Parse.customPopulation.TryGetValue(improvementData.type, out var popAtLevel) &&
+                    popAtLevel != null && popAtLevel.Length > 0)
+                {
+                    int oldPop = (currentLevel > 0 && currentLevel <= popAtLevel.Length) ? popAtLevel[currentLevel - 1] : 0;
+                    int newPop = (newLevel > 0 && newLevel <= popAtLevel.Length) ? popAtLevel[newLevel - 1] : 0;
+
+                    int delta = newPop - oldPop;
+
+                    modLogger.LogInfo($"Lord improvement level changed: {currentLevel} → {newLevel} | Territory: {territoryCount} | Pop delta: {delta}");
+
+                    if (delta > 0)
+                    {
+                        modLogger.LogInfo($"Adding {delta} population");
+                        for (int j = 0; j < delta; j++)
+                        {
+                            gameState.ActionStack.Add(new IncreasePopulationAction(tile.owner, tile.coordinates, tile.rulingCityCoordinates, 60));
+                        }
+                    }
+                    else if (delta < 0)
+                    {
+                        modLogger.LogInfo($"Removing {-delta} population");
+                        for (int j = 0; j < -delta; j++)
+                        {
+                            gameState.ActionStack.Add(new DecreasePopulationAction(tile.owner, tile.rulingCityCoordinates, 200));
+                        }
+                    }
+                }
+
+                // Update level
+                tile.improvement.level = (ushort)newLevel;
+                modLogger.LogInfo("Final level prefix: " + tile.improvement.level);
+                // tile.improvement.level += 1;
+                // modLogger.LogInfo("Final level postfix: " + tile.improvement.level);
+            }
         }
+
+        __result = tile.improvement.level;
+
+        // IMPORTANT: Return false to SKIP the original method
+        return false;
     }
-
-    __result = tile.improvement.level;
-
-    // IMPORTANT: Return false to SKIP the original method
-    return false;
-}
 
     // Required for destroying an improvement using customPopulation
     [HarmonyPostfix]
@@ -533,9 +559,11 @@ private static bool ActionUtils_CalculateImprovementLevel(GameState gameState, T
                 if (unitData.HasAbility(EnumCache<UnitAbility.Type>.GetType("mercenary")))
                 {
                     bool flag = false;
-                    for (int j = 0; j < state.Map.Tiles.Length; j++)
+                    TileData cityTile = state.Map.GetTile(tile.rulingCityCoordinates);  
+                    Il2CppSystem.Collections.Generic.List<TileData> cityAreaSorted = ActionUtils.GetCityAreaSorted(state, cityTile);
+                    for (int j = 0; j < cityAreaSorted.Count; j++)
                     {
-                        TileData tileData = state.Map.Tiles[j];
+                        TileData tileData = cityAreaSorted[j];
                         if (tileData.unit != null && tileData.unit.owner == __instance.PlayerId && tileData.unit.type == unitData.type)
                         {
                             flag = true;
